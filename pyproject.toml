@@ -115,6 +115,7 @@ xfail_strict = true
 [tool.coverage.run]
 source = ["oomless"]
 branch = true
+patch = ["subprocess"]   # count the oomless runs the tests start
 
 [tool.coverage.report]
 fail_under = 80
