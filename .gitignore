@@ -2,3 +2,4 @@
 dist/
 oomless-report/
 __pycache__/
+.coverage
