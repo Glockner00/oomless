@@ -1,0 +1,126 @@
+[build-system]
+requires = ["uv_build>=0.13.8,<0.14.0"]   # match your uv minor version
+build-backend = "uv_build"
+
+[project]
+name = "oomless"
+version = "0.0.1"
+description = "Tells you why your PyTorch training ran out of GPU memory, and how to fix it."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Axel Glöckner", email = "94395668+Glockner00@users.noreply.github.com" }
+]
+requires-python = ">=3.11"
+dependencies = []          # do NOT list torch: users already have the right CUDA/ROCm build
+keywords = ["pytorch", "cuda", "rocm", "gpu", "out-of-memory", "oom", "memory", "debugging"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Framework :: Jupyter",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Debuggers",
+  "Typing :: Typed",
+]
+
+[project.scripts]
+oomless = "oomless.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Glockner00/oomless"
+Issues = "https://github.com/Glockner00/oomless/issues"
+Changelog = "https://github.com/Glockner00/oomless/blob/main/CHANGELOG.md"
+
+[dependency-groups]
+test = [
+  "pytest>=9.2",
+  "pytest-cov>=7.1",
+  "pytest-socket>=0.8.1",
+  "pytest-timeout>=2.4",
+  "syrupy>=6.1",
+  "ipython>=9",
+]
+torch = ["torch>=2.9"]
+lint = ["prek>=0.5.10", "mypy>=2.4"]
+dev = [{ include-group = "test" }, { include-group = "torch" }, { include-group = "lint" }]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]   # dev/CI use the small CPU build; users bring their own
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "A", "B", "BLE", "C4", "D", "E", "F", "FURB", "I", "ISC", "LOG", "N", "PERF", "PGH",
+  "PIE", "PL", "PT", "PTH", "RET", "RSE", "RUF", "S", "SIM", "SLF", "T20", "TC", "TID",
+  "TRY", "UP", "W",
+]
+ignore = [
+  "D105", "D107",  # no docstring needed for magic methods and __init__
+  "E501",          # line length is the formatter's job
+  "PLR0913",       # rule functions may take many inputs
+  "PLR2004",       # numbers are normal in memory maths
+  "TRY003",        # long error messages are fine
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/oomless/record.py" = ["SLF001"]   # the ONE place allowed to use private PyTorch functions
+"src/oomless/cli.py" = ["T20"]         # the CLI prints
+"tests/**" = ["D", "S101", "SLF001", "PLR2004"]
+"examples/**" = ["D", "T20", "S"]      # deliberately broken training scripts
+"scripts/**" = ["D", "T20"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["oomless"]
+
+[tool.mypy]
+strict = true
+files = ["src"]
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--disable-socket", "--allow-unix-socket", "--timeout=120"]
+markers = [
+  "gpu: needs a real CUDA or ROCm GPU (skipped otherwise)",
+  "slow: takes more than a few seconds",
+]
+xfail_strict = true
+
+[tool.coverage.run]
+source = ["oomless"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = true
+exclude_also = ["if TYPE_CHECKING:", "@overload", "raise NotImplementedError"]
+
+[tool.codespell]
+skip = "*.pickle,*.gz,uv.lock,tests/__snapshots__/*"
