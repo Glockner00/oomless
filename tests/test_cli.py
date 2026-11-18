@@ -72,7 +72,7 @@ def test_report_after_a_crash(
     cli._report(recorder, recorder.snapshot)
     err = capsys.readouterr().err
     assert err.startswith("\noomless: the GPU ran out of memory\n")
-    assert "\nRecording saved in oomless-report/snapshot.pickle\n" in err
+    assert f"\nRecording saved in {Path('oomless-report', 'snapshot.pickle')}\n" in err
     assert load(tmp_path / "oomless-report" / "snapshot.pickle") == recorder.snapshot
 
 
