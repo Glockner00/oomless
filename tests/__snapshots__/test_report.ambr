@@ -31,6 +31,12 @@
     The GPU itself still had 8.49 GiB free: the limit was PyTorch's
     own, set with torch.cuda.set_per_process_memory_fraction.
   
+  What fits (an estimate)
+    Batch size 4096 needs about 37.99 GiB. PyTorch can use 7.96 GiB here.
+    Use batch size 512: it needs about 4.90 GiB.
+    To train as if the batch were still 4096, add up the gradients of
+    8 batches before each optimizer step (gradient accumulation).
+  
   What uses the memory, by the line in your code
      7.00 GiB  examples/train_cifar.py:71   loss = nn.functional.cross_entropy(model(x), y)
                   2.00 GiB  in torchvision/models/resnet.py:92 (forward)
@@ -72,6 +78,12 @@
     The GPU itself still had 7.72 GiB free: the limit was PyTorch's
     own, set with torch.cuda.set_per_process_memory_fraction.
   
+  What fits (an estimate)
+    Batch size 32 needs about 8.72 GiB. PyTorch can use 7.96 GiB here.
+    Use batch size 16: it needs about 5.29 GiB.
+    To train as if the batch were still 32, add up the gradients of
+    2 batches before each optimizer step (gradient accumulation).
+  
   What uses the memory, by the line in your code
      6.37 GiB  examples/train_gpt2.py:74   trainer.train()
                   2.25 GiB  in transformers/activations.py:66 (forward)
@@ -91,6 +103,12 @@
     PyTorch held 7.90 GiB: 7.80 GiB in use, 107 MiB free (largest free piece 32 MiB).
     The GPU itself still had 7.68 GiB free: the limit was PyTorch's
     own, set with torch.cuda.set_per_process_memory_fraction.
+  
+  What fits (an estimate)
+    Batch size 8 needs about 22.04 GiB. PyTorch can use 7.96 GiB here.
+    Use batch size 2: it needs about 6.90 GiB.
+    To train as if the batch were still 8, add up the gradients of
+    4 batches before each optimizer step (gradient accumulation).
   
   What uses the memory, by the line in your code
      7.34 GiB  examples/train_gpt2.py:74   trainer.train()

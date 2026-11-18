@@ -70,3 +70,31 @@ def test_shows_your_code(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     snap = fake(GiB, [], 2 * GiB)
     snap["device_traces"][0][0]["frames"] = [frame]
     assert "  at train.py:2   x = torch.ones(9, device='cuda')\n" in report.explain(snap)
+
+
+def test_what_fits() -> None:
+    snap = fake(700 * MiB, [200 * MiB], 100 * MiB, device_free=10 * GiB)
+    step: dict[str, Any] = {
+        "start": 100 * MiB,
+        "gradients": 0,
+        "end": None,
+        "batch": 64,
+        "leaves": 10,
+        "called": 5,
+        "steps_done": 0,
+        "weights": 50 * MiB,
+        "optimizers": [],
+    }
+    snap["oomless"] = {"limit": 1000 * MiB, "step": step}
+    assert (
+        "\nWhat fits (an estimate)\n"
+        "  Batch size 64 needs about 1.61 GiB. PyTorch can use 1000 MiB here.\n"
+        "  Use batch size 16: it needs about 600 MiB.\n"
+        "  To train as if the batch were still 64, add up the gradients of\n"
+        "  4 batches before each optimizer step (gradient accumulation).\n"
+    ) in report.explain(snap)
+
+    step["weights"] = 400 * MiB
+    assert (
+        "  Even batch size 1 needs about 1.66 GiB: the model is too big for this GPU.\n"
+    ) in report.explain(snap)

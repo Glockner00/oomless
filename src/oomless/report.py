@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+from oomless import estimate
 from oomless.snapshot import Frame, where
 
 GiB = 1024**3
@@ -63,6 +64,8 @@ def explain(snap: dict[str, Any]) -> str:
                 f"but in pieces of at most {_size(largest)}.",
                 "  Fix: set PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before you start Python.",
             ]
+        if fit := estimate.what_fits(snap.get("oomless") or {}, oom, in_use, held):
+            lines += ["", *_what_fits(fit)]
 
     lines += ["", "What uses the memory, by the line in your code"]
     by_line: Counter[str] = Counter()
@@ -82,6 +85,26 @@ def explain(snap: dict[str, Any]) -> str:
     if rest := in_use - sum(size for _, size in by_line.most_common(TOP)):
         lines.append(f"  {_size(rest):>9}  other lines")
     return "\n".join(lines) + "\n"
+
+
+def _what_fits(fit: estimate.Fit) -> list[str]:
+    need, can = _size(fit.peak), _size(fit.capacity)
+    lines = [
+        "What fits (an estimate)",
+        f"  Batch size {fit.batch} needs about {need}. PyTorch can use {can} here.",
+    ]
+    if fit.suggested is None:
+        need = _size(fit.suggested_peak)
+        return [
+            *lines,
+            f"  Even batch size 1 needs about {need}: the model is too big for this GPU.",
+        ]
+    return [
+        *lines,
+        f"  Use batch size {fit.suggested}: it needs about {_size(fit.suggested_peak)}.",
+        f"  To train as if the batch were still {fit.batch}, add up the gradients of",
+        f"  {fit.batch // fit.suggested} batches before each optimizer step (gradient accumulation).",
+    ]
 
 
 def _place(frames: list[Frame]) -> str:

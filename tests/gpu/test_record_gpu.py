@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -35,13 +36,29 @@ pieces = [torch.empty(200 * MiB, dtype=torch.uint8, device="cuda") for _ in rang
 del pieces[::2]
 torch.empty(2048 * MiB, dtype=torch.uint8, device="cuda")
 """
+TRAIN = """\
+import sys
+import torch
+torch.cuda.set_per_process_memory_fraction(0.35)
+layers = [torch.nn.Sequential(torch.nn.Linear(4096, 4096), torch.nn.ReLU()) for _ in range(8)]
+model = torch.nn.Sequential(*layers).cuda()
+optimizer = torch.optim.AdamW(model.parameters())
+batch = int(sys.argv[1])
+for _ in range(3):
+    model(torch.randn(batch, 4096, device="cuda")).square().mean().backward()
+    optimizer.step()
+    optimizer.zero_grad()
+print(torch.cuda.max_memory_reserved() / (0.35 * torch.cuda.mem_get_info()[1]))
+"""
 
 
-def run(tmp_path: Path, code: str, env: dict[str, str] | None = None) -> tuple[int, str]:
+def run(
+    tmp_path: Path, code: str, env: dict[str, str] | None = None, args: tuple[str, ...] = ()
+) -> tuple[int, str]:
     assert OOMLESS
     (tmp_path / "train.py").write_text(code)
     done = subprocess.run(  # noqa: S603
-        [OOMLESS, "train.py"],
+        [OOMLESS, "train.py", *args],
         cwd=tmp_path,
         capture_output=True,
         text=True,
@@ -86,3 +103,18 @@ def test_fragmented(tmp_path: Path) -> None:
 
     code, err = run(tmp_path, FRAGMENTED, {"PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"})
     assert (code, err) == (0, "")
+
+
+def test_suggested_batch_fits(tmp_path: Path) -> None:
+    code, err = run(tmp_path, TRAIN, args=("65536",))
+    assert code == 1
+    found = re.search(r"\n  Use batch size (\d+): ", err)
+    assert found, err
+    done = subprocess.run(  # noqa: S603
+        [sys.executable, "train.py", found[1]],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert float(done.stdout) <= 0.95
