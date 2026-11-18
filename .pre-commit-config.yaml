@@ -18,6 +18,7 @@ repos:
       - id: check-yaml
       - id: end-of-file-fixer
       - id: trailing-whitespace
+        exclude: ^tests/__snapshots__/   # syrupy indents blank lines on purpose
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
     rev: v1.32.0
     hooks:

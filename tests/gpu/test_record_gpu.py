@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 import sys
@@ -24,15 +25,35 @@ except torch.OutOfMemoryError:
     if {reraise}:
         raise
 """
+FRAGMENTED = """\
+import torch
+torch.cuda.set_per_process_memory_fraction(0.35)
+MiB = 2**20
+big = torch.empty(4096 * MiB, dtype=torch.uint8, device="cuda")
+del big
+pieces = [torch.empty(200 * MiB, dtype=torch.uint8, device="cuda") for _ in range(20)]
+del pieces[::2]
+torch.empty(2048 * MiB, dtype=torch.uint8, device="cuda")
+"""
+
+
+def run(tmp_path: Path, code: str, env: dict[str, str] | None = None) -> tuple[int, str]:
+    assert OOMLESS
+    (tmp_path / "train.py").write_text(code)
+    done = subprocess.run(  # noqa: S603
+        [OOMLESS, "train.py"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, **(env or {})},
+    )
+    return done.returncode, done.stderr
 
 
 @pytest.mark.parametrize(("reraise", "code"), [(True, 1), (False, 0)], ids=["crash", "caught"])
 def test_saves_the_recording(tmp_path: Path, reraise: bool, code: int) -> None:
-    assert OOMLESS
-    script = tmp_path / "train.py"
-    script.write_text(SCRIPT.format(reraise=reraise))
-    done = subprocess.run([OOMLESS, "train.py"], cwd=tmp_path, check=False)  # noqa: S603
-    assert done.returncode == code
+    assert run(tmp_path, SCRIPT.format(reraise=reraise))[0] == code
 
     snap = snapshot.load(tmp_path / "oomless-report" / "snapshot.pickle")
     oom = [e for trace in snap["device_traces"] for e in trace if e["action"] == "oom"]
@@ -43,4 +64,25 @@ def test_saves_the_recording(tmp_path: Path, reraise: bool, code: int) -> None:
         for b in s["blocks"]
         if b["state"] == "active_allocated" and b["size"] == 2**30
     ]
-    assert kept == [{"filename": str(script), "line": 3, "name": "<module>"}]
+    assert kept == [{"filename": str(tmp_path / "train.py"), "line": 3, "name": "<module>"}]
+
+
+def test_explains_the_crash(tmp_path: Path) -> None:
+    code, err = run(tmp_path, SCRIPT.format(reraise=True))
+    assert code == 1
+    assert "\noomless: the GPU ran out of memory\n  at train.py:5   torch.empty(2**40," in err
+    assert (
+        '\n   1.00 GiB  train.py:3   kept = torch.empty(2**30, dtype=torch.uint8, device="cuda")\n'
+        in err
+    )
+    assert "fragmented" not in err
+
+
+def test_fragmented(tmp_path: Path) -> None:
+    code, err = run(tmp_path, FRAGMENTED)
+    assert code == 1
+    assert "\nThe memory is fragmented: " in err
+    assert "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True" in err
+
+    code, err = run(tmp_path, FRAGMENTED, {"PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"})
+    assert (code, err) == (0, "")
