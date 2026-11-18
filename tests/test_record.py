@@ -1,6 +1,8 @@
+import gc
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -16,8 +18,25 @@ SNAP: dict[str, Any] = {"segments": [], "device_traces": [[{"action": "oom", "si
 
 @pytest.fixture
 def recorder(monkeypatch: pytest.MonkeyPatch) -> record.Recorder:
-    monkeypatch.setattr(torch.cuda.memory, "_snapshot", lambda device=None: SNAP)
+    monkeypatch.setattr(torch.cuda.memory, "_snapshot", lambda device=None: dict(SNAP))
     return record.Recorder()
+
+
+@pytest.fixture
+def hooked(monkeypatch: pytest.MonkeyPatch) -> Iterator[record.Recorder]:
+    monkeypatch.setattr(torch.cuda.memory, "_record_memory_history", lambda **kw: None)
+    monkeypatch.setattr(
+        torch._C, "_cuda_attach_out_of_memory_observer", lambda f: None, raising=False
+    )
+    rec = record.Recorder()
+    rec._start()
+    yield rec
+    for handle in rec._hooks:
+        handle.remove()
+
+
+def mlp() -> Any:
+    return torch.nn.Sequential(torch.nn.Linear(4, 8), torch.nn.ReLU(), torch.nn.Linear(8, 2))
 
 
 def test_starts_when_your_script_imports_torch(tmp_path: Path) -> None:
@@ -63,7 +82,7 @@ def test_saves_the_recording_from_the_oom_callback(
     recorder.on_error(torch.OutOfMemoryError("CUDA out of memory"))
     path = recorder.save(tmp_path / "report")
     assert path == tmp_path / "report" / "snapshot.pickle"
-    assert snapshot.load(path) == SNAP
+    assert snapshot.load(path) == {**SNAP, "oomless": {"limit": 3, "step": None}}
 
 
 def test_takes_the_recording_if_the_callback_never_ran(
@@ -100,3 +119,64 @@ def test_never_breaks_your_script(
     assert capsys.readouterr().err == (
         "oomless: can't record GPU memory: RuntimeError('changed in this PyTorch version')\n"
     )
+
+
+def test_measures_the_first_two_training_steps(hooked: record.Recorder) -> None:
+    gc.collect()
+    model = mlp()
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+    weights = (4 * 8 + 8 + 8 * 2 + 2) * 4
+    for done in range(2):
+        loss = torch.nn.MSELoss()(model(torch.ones(16, 4)), torch.zeros(16, 2))
+        assert hooked._measured() == {
+            "start": 0,
+            "gradients": weights * done,
+            "end": 0,
+            "batch": 16,
+            "leaves": 3,
+            "called": 3,
+            "steps_done": done,
+            "weights": weights,
+            "optimizers": [{"name": "SGD", "momentum": 0.9, "fused": False}],
+        }
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+    assert hooked._measured() is None
+    model(torch.ones(16, 4))
+    assert not hooked._hooks
+
+
+def test_measures_a_crash_inside_the_model(hooked: record.Recorder) -> None:
+    model = torch.nn.Sequential(torch.nn.Linear(4, 8), torch.nn.ReLU(), torch.nn.Linear(3, 2))
+    with pytest.raises(RuntimeError):
+        model(torch.ones(16, 4))
+    measured = hooked._measured()
+    assert measured
+    assert (measured["called"], measured["leaves"], measured["end"]) == (3, 3, None)
+    assert hooked._depth == 0
+
+
+def test_no_measurements_without_training(hooked: record.Recorder) -> None:
+    assert hooked._measured() is None
+    model = mlp()
+    model(torch.ones(16, 4))
+    with torch.no_grad():
+        model(torch.ones(16, 4))
+    assert hooked._measured() is None
+
+
+def test_measuring_never_breaks_your_training(
+    hooked: record.Recorder, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def broken() -> int:
+        raise RuntimeError("changed")
+
+    monkeypatch.setattr(torch.cuda, "memory_allocated", broken)
+    model = mlp()
+    model(torch.ones(16, 4))
+    model(torch.ones(16, 4))
+    assert capsys.readouterr().err == (
+        "oomless: can't measure the training step: RuntimeError('changed')\n"
+    )
+    assert not hooked._hooks

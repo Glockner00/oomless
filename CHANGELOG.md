@@ -15,6 +15,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   whether the memory was fragmented, with the fix.
 - It also saves a recording of the GPU memory in `oomless-report/snapshot.pickle`. Open it at
   https://pytorch.org/memory_viz to see every allocation.
+- If the crash comes in one of the first two training steps, oomless estimates the largest
+  batch size that fits, and how many batches to add up (gradient accumulation) to train as
+  before. If even batch size 1 is too big, it says so.
 - `oomless explain oomless-report/snapshot.pickle` shows the report again, also for a recording
   someone sends you. It refuses files that would run code.
 - `oomless doctor` prints the versions, your graphics cards and their free memory.
