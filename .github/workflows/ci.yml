@@ -88,3 +88,4 @@ jobs:
           uv venv /tmp/smoke
           uv pip install --python /tmp/smoke dist/*.whl
           /tmp/smoke/bin/oomless --version
+          /tmp/smoke/bin/oomless doctor

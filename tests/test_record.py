@@ -57,13 +57,13 @@ def test_waits_until_cuda_starts(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_saves_the_recording_from_the_oom_callback(
-    recorder: record.Recorder, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    recorder: record.Recorder, tmp_path: Path
 ) -> None:
     recorder._on_oom(0, 2, 3, 1)
     recorder.on_error(torch.OutOfMemoryError("CUDA out of memory"))
-    recorder.save(tmp_path / "report")
-    assert snapshot.load(tmp_path / "report" / "snapshot.pickle") == SNAP
-    assert "Recording saved in" in capsys.readouterr().err
+    path = recorder.save(tmp_path / "report")
+    assert path == tmp_path / "report" / "snapshot.pickle"
+    assert snapshot.load(path) == SNAP
 
 
 def test_takes_the_recording_if_the_callback_never_ran(
@@ -81,16 +81,12 @@ def test_takes_the_recording_if_the_callback_never_ran(
 def test_no_recording_without_a_gpu_oom(
     recorder: record.Recorder,
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
     error: Exception,
     cuda_started: bool,
 ) -> None:
     monkeypatch.setattr(torch.cuda, "is_initialized", lambda: cuda_started)
     recorder.on_error(error)
-    recorder.save(tmp_path / "report")
-    assert not (tmp_path / "report").exists()
-    assert capsys.readouterr().err == ""
+    assert recorder.snapshot is None
 
 
 def test_never_breaks_your_script(

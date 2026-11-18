@@ -1,0 +1,104 @@
+# serializer version: 1
+# name: test_real_crashes[amd-radeon-rx-9060-xt/cifar_eval_no_grad]
+  '''
+  oomless: the GPU ran out of memory
+    at examples/train_cifar.py:59   out = model(x)
+       inside torchvision/models/resnet.py:97 (forward)
+    It asked for 8 MiB more.
+    PyTorch held 7.95 GiB: 7.94 GiB in use, 16 MiB free (largest free piece 4 MiB).
+    The GPU itself still had 7.41 GiB free: the limit was PyTorch's
+    own, set with torch.cuda.set_per_process_memory_fraction.
+  
+  What uses the memory, by the line in your code
+     7.78 GiB  examples/train_cifar.py:59   out = model(x)
+                  1.63 GiB  in torchvision/models/resnet.py:96 (forward)
+                  1.63 GiB  in torchvision/models/resnet.py:93 (forward)
+                  1.63 GiB  in torchvision/models/resnet.py:92 (forward)
+       45 MiB  no Python code (PyTorch itself)
+       43 MiB  examples/train_cifar.py:74   optimizer.step()
+                    43 MiB  in torch/optim/optimizer.py:567 (wrapper)
+       69 MiB  other lines
+  
+  '''
+# ---
+# name: test_real_crashes[amd-radeon-rx-9060-xt/cifar_too_big]
+  '''
+  oomless: the GPU ran out of memory
+    at examples/train_cifar.py:71   loss = nn.functional.cross_entropy(model(x), y)
+       inside torchvision/models/resnet.py:93 (forward)
+    It asked for 1.00 GiB more.
+    PyTorch held 7.11 GiB: 7.09 GiB in use, 21 MiB free (largest free piece 11 MiB).
+    The GPU itself still had 8.49 GiB free: the limit was PyTorch's
+    own, set with torch.cuda.set_per_process_memory_fraction.
+  
+  What uses the memory, by the line in your code
+     7.00 GiB  examples/train_cifar.py:71   loss = nn.functional.cross_entropy(model(x), y)
+                  2.00 GiB  in torchvision/models/resnet.py:92 (forward)
+                  1.00 GiB  in torchvision/models/resnet.py:97 (forward)
+                  1.00 GiB  in torchvision/models/resnet.py:93 (forward)
+       48 MiB  examples/train_cifar.py:70   x, y = images.cuda(), labels.cuda()
+       43 MiB  examples/train_cifar.py:48   model = model.cuda()
+                    43 MiB  in torch/nn/modules/module.py:1098 (cuda)
+  
+  '''
+# ---
+# name: test_real_crashes[amd-radeon-rx-9060-xt/gpt2_keep_outputs]
+  '''
+  oomless: the GPU ran out of memory
+    at examples/train_gpt2.py:74   trainer.train()
+       inside transformers/trainer_pt_utils.py:86 (torch_pad_and_concatenate)
+    It asked for 2.68 GiB more.
+    PyTorch held 5.46 GiB: 4.08 GiB in use, 1.39 GiB free (largest free piece 982 MiB).
+    The GPU itself still had 10.05 GiB free: the limit was PyTorch's
+    own, set with torch.cuda.set_per_process_memory_fraction.
+  
+  What uses the memory, by the line in your code
+     3.61 GiB  examples/train_gpt2.py:74   trainer.train()
+                  2.49 GiB  in transformers/trainer_pt_utils.py:86 (torch_pad_and_concatenate)
+                   953 MiB  in accelerate/optimizer.py:186 (step)
+                   196 MiB  in transformers/models/gpt2/modeling_gpt2.py:695 (forward)
+      475 MiB  examples/train_gpt2.py:53   trainer = Trainer(
+                   475 MiB  in transformers/modeling_utils.py:3780 (to)
+  
+  '''
+# ---
+# name: test_real_crashes[amd-radeon-rx-9060-xt/gpt2_too_big]
+  '''
+  oomless: the GPU ran out of memory
+    at examples/train_gpt2.py:74   trainer.train()
+       inside transformers/loss/loss_utils.py:42 (fixed_cross_entropy)
+    It asked for 785 MiB more.
+    PyTorch held 7.78 GiB: 6.83 GiB in use, 972 MiB free (largest free piece 642 MiB).
+    The GPU itself still had 7.72 GiB free: the limit was PyTorch's
+    own, set with torch.cuda.set_per_process_memory_fraction.
+  
+  What uses the memory, by the line in your code
+     6.37 GiB  examples/train_gpt2.py:74   trainer.train()
+                  2.25 GiB  in transformers/activations.py:66 (forward)
+                  1.05 GiB  in transformers/integrations/sdpa_attention.py:193 (sdpa_attention_forward)
+                   956 MiB  in accelerate/optimizer.py:186 (step)
+      475 MiB  examples/train_gpt2.py:53   trainer = Trainer(
+                   475 MiB  in transformers/modeling_utils.py:3780 (to)
+  
+  '''
+# ---
+# name: test_real_crashes[amd-radeon-rx-9060-xt/gpt2_too_long]
+  '''
+  oomless: the GPU ran out of memory
+    at examples/train_gpt2.py:74   trainer.train()
+       inside transformers/activations.py:66 (forward)
+    It asked for 96 MiB more.
+    PyTorch held 7.90 GiB: 7.80 GiB in use, 107 MiB free (largest free piece 32 MiB).
+    The GPU itself still had 7.68 GiB free: the limit was PyTorch's
+    own, set with torch.cuda.set_per_process_memory_fraction.
+  
+  What uses the memory, by the line in your code
+     7.34 GiB  examples/train_gpt2.py:74   trainer.train()
+                  4.57 GiB  in transformers/integrations/sdpa_attention.py:193 (sdpa_attention_forward)
+                  1.59 GiB  in transformers/activations.py:66 (forward)
+                   480 MiB  in transformers/pytorch_utils.py:119 (forward)
+      475 MiB  examples/train_gpt2.py:53   trainer = Trainer(
+                   475 MiB  in transformers/modeling_utils.py:3780 (to)
+  
+  '''
+# ---

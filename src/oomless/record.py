@@ -11,20 +11,22 @@ from collections.abc import Callable, Sequence
 from importlib.machinery import ModuleSpec
 from pathlib import Path
 from types import ModuleType
-from typing import Any, ParamSpec
+from typing import Any, ParamSpec, TypeVar
 
 MAX_ENTRIES = 100_000
 
 P = ParamSpec("P")
+R = TypeVar("R")
 
 
-def _never_raise(fn: Callable[P, None]) -> Callable[P, None]:
+def _never_raise(fn: Callable[P, R]) -> Callable[P, R | None]:
     @functools.wraps(fn)
-    def run(*args: P.args, **kwargs: P.kwargs) -> None:
+    def run(*args: P.args, **kwargs: P.kwargs) -> R | None:
         try:
-            fn(*args, **kwargs)
+            return fn(*args, **kwargs)
         except Exception as exc:  # noqa: BLE001
             sys.stderr.write(f"oomless: can't record GPU memory: {exc!r}\n")
+            return None
 
     return run
 
@@ -94,18 +96,13 @@ class Recorder:
             self.snapshot = torch.cuda.memory._snapshot()
 
     @_never_raise
-    def save(self, folder: Path) -> None:
-        """Save the recording in `folder`, if the GPU ran out of memory."""
-        if self.snapshot is None:
-            return
+    def save(self, folder: Path) -> Path:
+        """Save the recording in `folder`."""
         folder.mkdir(exist_ok=True)
         path = folder / "snapshot.pickle"
         with path.open("wb") as f:
             pickle.dump(self.snapshot, f)
-        sys.stderr.write(
-            f"oomless: the GPU ran out of memory. Recording saved in {path}\n"
-            "  (open it at https://pytorch.org/memory_viz to see every allocation)\n"
-        )
+        return path
 
 
 def start() -> Recorder:
