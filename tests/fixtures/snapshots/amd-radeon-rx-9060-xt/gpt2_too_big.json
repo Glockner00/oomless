@@ -1,0 +1,11 @@
+{
+  "command": [
+    "examples/train_gpt2.py",
+    "--batch-size",
+    "32"
+  ],
+  "expected": "too-big",
+  "gpu": "AMD Radeon RX 9060 XT",
+  "total_bytes": 17095983104,
+  "torch": "2.15.0+rocm7.14"
+}

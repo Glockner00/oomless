@@ -1,0 +1,13 @@
+{
+  "command": [
+    "examples/train_cifar.py",
+    "--batch-size",
+    "4096",
+    "--epochs",
+    "1"
+  ],
+  "expected": "too-big",
+  "gpu": "AMD Radeon RX 9060 XT",
+  "total_bytes": 17095983104,
+  "torch": "2.15.0+rocm7.14"
+}
