@@ -86,7 +86,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "src/oomless/record.py" = ["SLF001"]   # the ONE place allowed to use private PyTorch functions
 "src/oomless/cli.py" = ["T20"]         # the CLI prints
-"tests/**" = ["D", "S101", "SLF001", "PLR2004"]
+"tests/**" = ["D", "S101", "SLF001", "PLR2004", "PLR0917"]   # tests take many fixtures
 "examples/**" = ["D", "T20", "S"]      # deliberately broken training scripts
 "scripts/**" = ["D", "T20"]
 

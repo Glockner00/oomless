@@ -1,0 +1,11 @@
+{
+  "command": [
+    "examples/train_gpt2.py",
+    "--bug",
+    "keep-outputs"
+  ],
+  "expected": "outputs-kept-on-gpu",
+  "gpu": "AMD Radeon RX 9060 XT",
+  "total_bytes": 17095983104,
+  "torch": "2.15.0+rocm7.14"
+}
